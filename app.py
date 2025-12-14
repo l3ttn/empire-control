@@ -1869,7 +1869,8 @@ with tab1:
         st.markdown("#### 📊 Analytics Dashboard")
 
         if st.session_state.sessoes_data:
-            from datetime import datetime
+            from datetime import datetime, timedelta, timezone
+            from collections import defaultdict
             import pandas as pd
 
             sessoes = st.session_state.sessoes_data
@@ -1931,6 +1932,100 @@ with tab1:
 
             st.markdown("---")
 
+            # META DIARIA - Barra de Progresso
+            st.markdown("#### 🎯 Meta Diaria: $100 USD")
+            
+            # Calcula quanto fez hoje
+            hoje_inicio = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            hoje_inicio_utc = hoje_inicio.astimezone(timezone.utc)
+            sessoes_hoje = [s for s in sessoes if s['fim'] >= hoje_inicio_utc]
+            tokens_hoje = sum(s['tokens_total'] for s in sessoes_hoje)
+            usd_hoje = tokens_hoje * 0.05
+            
+            # Progresso da meta
+            meta_usd = 100.0
+            progresso = min(usd_hoje / meta_usd, 1.0)  # Cap em 100%
+            progresso_pct = progresso * 100
+            
+            # Cor baseada no progresso
+            if progresso >= 1.0:
+                cor_barra = "#00ff88"
+                status_meta = "META BATIDA!"
+            elif progresso >= 0.75:
+                cor_barra = "#ffd700"
+                status_meta = "Quase la!"
+            elif progresso >= 0.5:
+                cor_barra = "#4da6ff"
+                status_meta = "Metade do caminho"
+            else:
+                cor_barra = "#ff4444"
+                status_meta = "Foco na live!"
+            
+            st.markdown(f"""
+            <div style="background: #1a1a1a; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <span style="color: #888;">Progresso Hoje</span>
+                    <span style="color: {cor_barra}; font-weight: bold;">${usd_hoje:.2f} / ${meta_usd:.0f} USD ({progresso_pct:.0f}%)</span>
+                </div>
+                <div style="background: #333; border-radius: 10px; height: 20px; overflow: hidden;">
+                    <div style="background: {cor_barra}; width: {progresso_pct}%; height: 100%; border-radius: 10px; transition: width 0.5s;"></div>
+                </div>
+                <p style="text-align: center; color: {cor_barra}; margin-top: 10px; font-weight: bold;">{status_meta}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("---")
+
+            # CLIENTES VIP - Top 20 All-Time
+            st.markdown("#### 👑 Clientes VIP (Top 20 All-Time)")
+            st.caption("Maiores gastadores de todo o historico - de atencao especial a eles!")
+            
+            # Agrupa todos os gastos por cliente (all-time)
+            gastos_vip = defaultdict(lambda: {'tokens': 0, 'transacoes': 0, 'revenue': 0.0, 'ultima_data': None})
+            
+            for trans in transacoes:
+                username = trans.get('username', 'Anonimo')
+                tokens = trans.get('tokens', 0)
+                gastos_vip[username]['tokens'] += tokens
+                gastos_vip[username]['transacoes'] += 1
+                gastos_vip[username]['revenue'] += tokens * 0.05 * cotacao_dolar
+                # Guarda data mais recente
+                trans_date = trans.get('timestamp')
+                if trans_date:
+                    if gastos_vip[username]['ultima_data'] is None or trans_date > gastos_vip[username]['ultima_data']:
+                        gastos_vip[username]['ultima_data'] = trans_date
+            
+            # Top 20 VIP
+            top_vip = sorted(gastos_vip.items(), key=lambda x: x[1]['tokens'], reverse=True)[:20]
+            
+            if top_vip:
+                col_vip1, col_vip2 = st.columns(2)
+                
+                # Primeira metade (1-10)
+                with col_vip1:
+                    for i, (username, info) in enumerate(top_vip[:10]):
+                        medalha = "🥇" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else f"#{i+1}"
+                        st.markdown(f"""
+                        <div style="background: #1a1a1a; border-radius: 8px; padding: 12px; margin: 4px 0; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: #00ff88; font-weight: bold;">{medalha} {username[:18]}</span>
+                            <span style="color: #ffd700;">{info['tokens']:,} tk | R$ {info['revenue']:.0f}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                
+                # Segunda metade (11-20)
+                with col_vip2:
+                    for i, (username, info) in enumerate(top_vip[10:20]):
+                        st.markdown(f"""
+                        <div style="background: #1a1a1a; border-radius: 8px; padding: 12px; margin: 4px 0; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: #888;">#{i+11} {username[:18]}</span>
+                            <span style="color: #4da6ff;">{info['tokens']:,} tk | R$ {info['revenue']:.0f}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.info("Sincronize dados para ver clientes VIP")
+
+            st.markdown("---")
+
             # Analytics Mensal
             st.markdown("#### 📅 Performance Mensal")
 
@@ -1987,13 +2082,13 @@ with tab1:
             with col_filtro1:
                 filtro = st.radio(
                     "Modo:",
-                    options=["Hoje", "Últimas 24h", "Última Semana", "Mês Atual", "Calendário", "Todas"],
+                    options=["Ultima Live", "Hoje", "Ontem", "Ultimas 24h", "Ultima Semana", "Mes Atual", "Calendario", "Todas"],
                     horizontal=True,
                     index=0
                 )
 
             with col_filtro2:
-                if filtro == "Calendário":
+                if filtro == "Calendario":
                     data_selecionada = st.date_input(
                         "Selecione o dia:",
                         value=date.today(),
@@ -2007,23 +2102,35 @@ with tab1:
             agora_utc = datetime.now(timezone.utc)
             sessoes_filtradas = sessoes.copy()
 
-            if filtro == "Hoje":
+            if filtro == "Ultima Live":
+                # Mostra apenas a sessao mais recente
+                if sessoes:
+                    sessoes_filtradas = [sessoes[-1]]
+                else:
+                    sessoes_filtradas = []
+            elif filtro == "Hoje":
                 # Desde 00h de hoje (timezone local)
                 hoje_inicio = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
                 hoje_inicio_utc = hoje_inicio.astimezone(timezone.utc)
                 sessoes_filtradas = [s for s in sessoes if s['fim'] >= hoje_inicio_utc]
-            elif filtro == "Últimas 24h":
+            elif filtro == "Ontem":
+                # Dia anterior completo
+                ontem = datetime.now().date() - timedelta(days=1)
+                inicio_ontem = datetime.combine(ontem, datetime.min.time()).astimezone(timezone.utc)
+                fim_ontem = datetime.combine(ontem, datetime.max.time()).astimezone(timezone.utc)
+                sessoes_filtradas = [s for s in sessoes if inicio_ontem <= s['inicio'] <= fim_ontem]
+            elif filtro == "Ultimas 24h":
                 inicio_24h = agora_utc - timedelta(hours=24)
                 sessoes_filtradas = [s for s in sessoes if s['fim'] >= inicio_24h]
-            elif filtro == "Última Semana":
+            elif filtro == "Ultima Semana":
                 inicio_semana = agora_utc - timedelta(days=7)
                 sessoes_filtradas = [s for s in sessoes if s['fim'] >= inicio_semana]
-            elif filtro == "Mês Atual":
+            elif filtro == "Mes Atual":
                 hoje = datetime.now().date()
                 inicio_mes = hoje.replace(day=1)
                 inicio_mes_dt = datetime.combine(inicio_mes, datetime.min.time()).astimezone(timezone.utc)
                 sessoes_filtradas = [s for s in sessoes if s['fim'] >= inicio_mes_dt]
-            elif filtro == "Calendário":
+            elif filtro == "Calendario":
                 # Filtra pelo dia selecionado
                 inicio_dia = datetime.combine(data_selecionada, datetime.min.time()).astimezone(timezone.utc)
                 fim_dia = datetime.combine(data_selecionada, datetime.max.time()).astimezone(timezone.utc)
