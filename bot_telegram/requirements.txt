@@ -1,0 +1,14 @@
+python-telegram-bot==20.7
+requests==2.31.0
+python-dotenv==1.0.0
+pytz==2024.1
+# FastAPI Async Stack
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+sqlalchemy[asyncio]==2.0.23
+httpx==0.25.2
+aiosqlite==0.19.0
+pydantic==2.5.0
+# Google Sheets Integration
+gspread==6.0.0
+google-auth==2.25.0

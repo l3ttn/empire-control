@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Visão Geral{% endblock %}
+
+{% block content %}
+<h2 class="section-title">📊 Visão Geral</h2>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>Total de Conteúdos</h3>
+        <div class="value">{{ total_contents }}</div>
+        <div class="change">Ativos no catálogo</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Vendas Realizadas</h3>
+        <div class="value">{{ total_sales }}</div>
+        <div class="change">Total de vendas completas</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Receita Total</h3>
+        <div class="value">R$ {{ "%.2f"|format(total_revenue) }}</div>
+        <div class="change">Todas as vendas</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Entregas Pendentes</h3>
+        <div class="value">{{ pending_deliveries }}</div>
+        <div class="change">Aguardando entrega</div>
+    </div>
+</div>
+
+<h3 style="margin-top: 40px; margin-bottom: 20px; font-size: 20px;">🔥 Top 5 Conteúdos Mais Vendidos</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Conteúdo</th>
+            <th>Vendas</th>
+            <th>Preço Unitário</th>
+            <th>Receita Total</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in top_contents %}
+        <tr>
+            <td>{{ item.title }}</td>
+            <td>{{ item.sales }}</td>
+            <td>R$ {{ "%.2f"|format(item.price) }}</td>
+            <td><strong>R$ {{ "%.2f"|format(item.revenue) }}</strong></td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="4" style="text-align: center; color: #6c757d;">Nenhuma venda registrada ainda</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h3 style="margin-top: 40px; margin-bottom: 20px; font-size: 20px;">💰 Vendas Recentes</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Data</th>
+            <th>Usuário ID</th>
+            <th>Conteúdo</th>
+            <th>Valor</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for sale in recent_sales %}
+        <tr>
+            <td>{{ sale.purchased_at[:16]|replace('T', ' ') }}</td>
+            <td>{{ sale.user_id }}</td>
+            <td>{{ sale.content_id }}</td>
+            <td>R$ {{ "%.2f"|format(sale.amount) }}</td>
+            <td>
+                {% if sale.delivered %}
+                    <span class="badge badge-success">Entregue</span>
+                {% else %}
+                    <span class="badge badge-warning">Pendente</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="5" style="text-align: center; color: #6c757d;">Nenhuma venda registrada ainda</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-refresh stats a cada 30 segundos
+    setInterval(() => {
+        fetch('/api/stats')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Stats atualizados:', data);
+                // Atualizar valores na tela se necessário
+            });
+    }, 30000);
+</script>
+{% endblock %}
+
