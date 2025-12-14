@@ -2,7 +2,7 @@
 EMPIRE CONTROL - Financial Dashboard
 =====================================
 Sistema de controle financeiro centralizado integrando:
-- Stipchat API (Revenue Tracking)
+- Revenue API (Revenue Tracking)
 - Inventory CSV (Stock Sales)
 - Household Expenses (Split 50/50)
 
@@ -688,7 +688,7 @@ def fazer_login_playwright_stealth():
                 time.sleep(random.uniform(min_sec, max_sec))
 
             # Navega para homepage com timing humano
-            page.goto('https://br.stripchat.com', wait_until='networkidle')
+            page.goto('https://br.platform.com', wait_until='networkidle')
             human_delay(3, 6)
 
             # Scroll aleatorio (simula leitura)
@@ -789,7 +789,7 @@ def fazer_login_interativo():
 
         try:
             # Vai para homepage primeiro (comportamento humano)
-            driver.get('https://br.stripchat.com')
+            driver.get('https://br.platform.com')
             human_delay(3, 6)
 
             # Scroll aleatorio (simula leitura)
@@ -797,14 +797,14 @@ def fazer_login_interativo():
             human_delay(1, 2)
 
             # Agora vai para login
-            driver.get('https://br.stripchat.com/login')
+            driver.get('https://br.platform.com/login')
             human_delay(2, 4)
 
             st.info("Navegador aberto! Faca login manualmente e marque 'Confiar neste dispositivo'. Aguardando...")
 
             # Aguarda usuario fazer login
             WebDriverWait(driver, 300).until(
-                lambda d: 'earnings' in d.current_url or d.current_url == 'https://br.stripchat.com/'
+                lambda d: 'earnings' in d.current_url or d.current_url == 'https://br.platform.com/'
             )
 
             # Usuario logou! Salvar cookies
@@ -812,12 +812,12 @@ def fazer_login_interativo():
             human_delay(2, 4)
 
             # Vai para página de earnings
-            driver.get('https://br.stripchat.com/earnings/tokens-history')
+            driver.get('https://br.platform.com/earnings/tokens-history')
             human_delay(5, 8)
 
             # Extrai dados via JavaScript
             script = """
-            return fetch('https://br.stripchat.com/api/front/v3/config/initial?requestPath=%2Fearnings%2Ftokens-history')
+            return fetch('https://br.platform.com/api/front/v3/config/initial?requestPath=%2Fearnings%2Ftokens-history')
                 .then(r => r.json())
                 .then(d => d);
             """
@@ -879,19 +879,19 @@ def fetch_stipchat_stats_com_cookies_salvos():
 
         try:
             # Vai para site primeiro
-            driver.get('https://br.stripchat.com')
+            driver.get('https://br.platform.com')
             time.sleep(random.uniform(2, 4))
 
             # Carrega cookies salvos
             carregar_cookies(driver, COOKIES_FILE)
 
             # Vai para página de earnings
-            driver.get('https://br.stripchat.com/earnings/tokens-history')
+            driver.get('https://br.platform.com/earnings/tokens-history')
             time.sleep(random.uniform(4, 6))
 
             # Extrai dados via JavaScript
             script = """
-            return fetch('https://br.stripchat.com/api/front/v3/config/initial?requestPath=%2Fearnings%2Ftokens-history')
+            return fetch('https://br.platform.com/api/front/v3/config/initial?requestPath=%2Fearnings%2Ftokens-history')
                 .then(r => r.json())
                 .then(d => d);
             """
@@ -943,7 +943,7 @@ def fetch_stipchat_stats_selenium(username, password):
 
         try:
             # Acessa página de login
-            driver.get('https://br.stripchat.com/login')
+            driver.get('https://br.platform.com/login')
             time.sleep(3)
 
             # Faz login
@@ -965,12 +965,12 @@ def fetch_stipchat_stats_selenium(username, password):
             driver.execute_cdp_cmd('Network.enable', {})
 
             # Vai para página de earnings
-            driver.get('https://br.stripchat.com/earnings/tokens-history')
+            driver.get('https://br.platform.com/earnings/tokens-history')
             time.sleep(5)
 
             # Captura dados via JavaScript
             script = """
-            return fetch('https://br.stripchat.com/api/front/v3/config/initial?requestPath=%2Fearnings%2Ftokens-history')
+            return fetch('https://br.platform.com/api/front/v3/config/initial?requestPath=%2Fearnings%2Ftokens-history')
                 .then(r => r.json())
                 .then(d => d);
             """
@@ -1003,13 +1003,13 @@ def fetch_stipchat_stats_requests(session_key, all_cookies=None):
     Usa requests com TODOS os cookies do browser.
     """
     try:
-        url = "https://br.stripchat.com/api/front/v3/config/initial"
+        url = "https://br.platform.com/api/front/v3/config/initial"
 
         params = {'requestPath': '/earnings/tokens-history'}
 
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Referer': 'https://br.stripchat.com/earnings/tokens-history',
+            'Referer': 'https://br.platform.com/earnings/tokens-history',
             'Accept': 'application/json, text/plain, */*',
             'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
             'Accept-Encoding': 'gzip, deflate, br',
@@ -1024,7 +1024,7 @@ def fetch_stipchat_stats_requests(session_key, all_cookies=None):
             cookies = all_cookies
         else:
             cookies = {
-                'stripchat_com_sessionId': session_key,
+                'platform_com_sessionId': session_key,
                 'localeDomain': 'br'
             }
 
@@ -1071,7 +1071,7 @@ def fetch_transacoes_periodo(user_id, all_cookies, dias=30):
         from_date = inicio.strftime('%Y-%m-%dT%H:%M:%SZ')
 
         # Endpoint descoberto
-        url = f'https://br.stripchat.com/api/front/users/{user_id}/transactions'
+        url = f'https://br.platform.com/api/front/users/{user_id}/transactions'
 
         params = {
             'from': from_date,
@@ -1082,7 +1082,7 @@ def fetch_transacoes_periodo(user_id, all_cookies, dias=30):
 
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Referer': 'https://br.stripchat.com/earnings/tokens-history',
+            'Referer': 'https://br.platform.com/earnings/tokens-history',
             'Accept': 'application/json, text/plain, */*',
             'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
             'Accept-Encoding': 'gzip, deflate, br',
@@ -1440,15 +1440,15 @@ st.sidebar.markdown(f"**🎯 Meta Diária = $100 USD**")
 
 # ==================== TABS ====================
 tab1, tab2, tab3, tab4 = st.tabs([
-    "🔴 STIPCHAT API",
+    "🔴 REVENUE API",
     "📦 INVENTORY (STOCK)",
     "🏠 HOUSEHOLD EXPENSES",
     "📊 EXECUTIVE DASHBOARD"
 ])
 
-# ==================== TAB 1: STIPCHAT API ====================
+# ==================== TAB 1: REVENUE API ====================
 with tab1:
-    st.markdown("### 🔴 Stipchat Revenue Tracking")
+    st.markdown("### 🔴 Revenue Revenue Tracking")
     st.markdown("Rastreamento em tempo real via API escondida da plataforma")
 
     col_sync, col_result = st.columns([1, 2])
@@ -2247,7 +2247,7 @@ with tab4:
 
     # Calcular totais de cada fonte
 
-    # 1. Stipchat Revenue
+    # 1. Revenue Revenue
     stipchat_revenue = 0
     if st.session_state.stipchat_data:
         tokens = st.session_state.stipchat_data['tokens']
@@ -2308,7 +2308,7 @@ with tab4:
     with col_b1:
         st.markdown(f"""
         <div class="kpi-card">
-            <p class="kpi-title">🔴 STIPCHAT REVENUE</p>
+            <p class="kpi-title">🔴 REVENUE REVENUE</p>
             <p class="kpi-value-green">R$ {stipchat_revenue:,.2f}</p>
         </div>
         """, unsafe_allow_html=True)
@@ -2406,7 +2406,7 @@ with tab4:
 
     if stipchat_revenue > 0 or stock_profit > 0:
         receita_data = pd.DataFrame({
-            'Fonte': ['Stipchat', 'Stock'],
+            'Fonte': ['Revenue', 'Stock'],
             'Valor': [stipchat_revenue, stock_profit]
         })
 
