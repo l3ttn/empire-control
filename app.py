@@ -83,6 +83,7 @@ def get_spreadsheet():
         
         spreadsheet_url = st.secrets.get("spreadsheet_url", None)
         if not spreadsheet_url:
+            st.warning("spreadsheet_url não encontrada nos secrets")
             return None
         
         spreadsheet = client.open_by_url(spreadsheet_url)
@@ -107,7 +108,9 @@ def get_spreadsheet():
         
         return spreadsheet
     except Exception as e:
+        st.error(f"Erro ao conectar Google Sheets: {e}")
         return None
+
 
 
 # Flag para usar Google Sheets ou arquivos locais
