@@ -2592,14 +2592,11 @@ with tab4:
         tokens = st.session_state.stipchat_data['tokens']
         stipchat_revenue = tokens * 0.05 * cotacao_dolar
 
-    # 2. Stock Profit
+    # 2. Stock Profit (lucro das vendas do Google Sheets)
     stock_profit = 0
-    if st.session_state.estoque_df is not None:
-        # Tentar encontrar coluna LUCRO
-        for col in st.session_state.estoque_df.columns:
-            if 'LUCRO' in col.upper() and '_limpo' in col:
-                stock_profit = st.session_state.estoque_df[col].sum()
-                break
+    vendas_dashboard = carregar_vendas()
+    if vendas_dashboard:
+        stock_profit = sum(v.get('lucro', 0) for v in vendas_dashboard)
 
     # 3. Total Expenses
     total_expenses = 0
