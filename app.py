@@ -2285,14 +2285,7 @@ with tab2:
 
             if btn_add_prod and prod_nome and prod_gramas > 0:
                 novo_prod = adicionar_produto(prod_nome, prod_gramas, prod_preco_compra, prod_desc)
-                st.session_state.ultimo_produto_adicionado = novo_prod['nome']
-        
-        # Mostra mensagem de sucesso fora do form (persiste após submit)
-        if 'ultimo_produto_adicionado' in st.session_state and st.session_state.ultimo_produto_adicionado:
-            st.success(f"✅ {st.session_state.ultimo_produto_adicionado} adicionado com sucesso!")
-            # Limpa após mostrar (para não mostrar eternamente)
-            if st.button("🔄 Adicionar outro", key="limpar_msg_produto", use_container_width=True):
-                st.session_state.ultimo_produto_adicionado = None
+                st.success(f"✅ {novo_prod['nome']} adicionado com sucesso!")
                 st.rerun()
 
     # COLUNA 2: Registrar Venda
