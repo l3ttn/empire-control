@@ -33,6 +33,96 @@ import time
 from playwright.sync_api import sync_playwright
 import asyncio
 
+# Google Sheets Integration
+try:
+    import gspread
+    from google.oauth2.service_account import Credentials
+    GSPREAD_AVAILABLE = True
+except ImportError:
+    GSPREAD_AVAILABLE = False
+
+# ==================== GOOGLE SHEETS CONFIG ====================
+def get_google_sheets_client():
+    """
+    Conecta ao Google Sheets usando credenciais do Streamlit Secrets.
+    Retorna None se não estiver configurado.
+    """
+    try:
+        if not GSPREAD_AVAILABLE:
+            return None
+        
+        if "gcp_service_account" not in st.secrets:
+            return None
+        
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        
+        credentials = Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
+            scopes=scopes
+        )
+        
+        client = gspread.authorize(credentials)
+        return client
+    except Exception as e:
+        st.warning(f"Google Sheets não configurado: {e}")
+        return None
+
+
+def get_spreadsheet():
+    """
+    Abre a planilha configurada nos secrets.
+    Cria as abas necessárias se não existirem.
+    """
+    try:
+        client = get_google_sheets_client()
+        if not client:
+            return None
+        
+        spreadsheet_url = st.secrets.get("spreadsheet_url", None)
+        if not spreadsheet_url:
+            return None
+        
+        spreadsheet = client.open_by_url(spreadsheet_url)
+        
+        # Garante que as abas existem
+        existing_sheets = [ws.title for ws in spreadsheet.worksheets()]
+        
+        if "Produtos" not in existing_sheets:
+            spreadsheet.add_worksheet(title="Produtos", rows=1000, cols=10)
+            ws = spreadsheet.worksheet("Produtos")
+            ws.append_row(["id", "nome", "descricao", "quantidade_gramas", "quantidade_inicial", "preco_compra_total", "vendido_gramas", "data_cadastro"])
+        
+        if "Vendas" not in existing_sheets:
+            spreadsheet.add_worksheet(title="Vendas", rows=1000, cols=10)
+            ws = spreadsheet.worksheet("Vendas")
+            ws.append_row(["id", "produto_id", "produto_nome", "cliente", "gramas", "valor_venda", "custo", "lucro", "data"])
+        
+        if "Despesas" not in existing_sheets:
+            spreadsheet.add_worksheet(title="Despesas", rows=1000, cols=5)
+            ws = spreadsheet.worksheet("Despesas")
+            ws.append_row(["data", "item", "valor", "pagador"])
+        
+        return spreadsheet
+    except Exception as e:
+        return None
+
+
+# Flag para usar Google Sheets ou arquivos locais
+USE_GOOGLE_SHEETS = False
+
+def init_google_sheets():
+    """Inicializa conexão com Google Sheets se disponível."""
+    global USE_GOOGLE_SHEETS
+    spreadsheet = get_spreadsheet()
+    if spreadsheet:
+        USE_GOOGLE_SHEETS = True
+        return True
+    return False
+
+
 # ==================== CONFIGURACAO DA PAGINA ====================
 st.set_page_config(
     page_title="Empire Control",
@@ -1244,7 +1334,22 @@ def processar_csv_estoque(uploaded_file):
 
 
 def carregar_despesas():
-    """Carrega dados de despesas do CSV."""
+    """Carrega dados de despesas do Google Sheets ou CSV local."""
+    try:
+        spreadsheet = get_spreadsheet()
+        if spreadsheet:
+            ws = spreadsheet.worksheet("Despesas")
+            data = ws.get_all_records()
+            if data:
+                df = pd.DataFrame(data)
+                if 'data' in df.columns:
+                    df['data'] = pd.to_datetime(df['data']).dt.date
+                return df
+            return pd.DataFrame(columns=['data', 'item', 'valor', 'pagador'])
+    except:
+        pass
+    
+    # Fallback para arquivo local
     if os.path.exists(DESPESAS_FILE):
         df = pd.read_csv(DESPESAS_FILE)
         df['data'] = pd.to_datetime(df['data']).dt.date
@@ -1253,7 +1358,23 @@ def carregar_despesas():
 
 
 def salvar_despesas(df):
-    """Salva dados de despesas no CSV."""
+    """Salva dados de despesas no Google Sheets ou CSV local."""
+    try:
+        spreadsheet = get_spreadsheet()
+        if spreadsheet:
+            ws = spreadsheet.worksheet("Despesas")
+            ws.clear()
+            # Header
+            ws.append_row(['data', 'item', 'valor', 'pagador'])
+            # Dados
+            for _, row in df.iterrows():
+                data_str = str(row['data']) if row['data'] else ''
+                ws.append_row([data_str, row['item'], float(row['valor']), row['pagador']])
+            return
+    except:
+        pass
+    
+    # Fallback para arquivo local
     df.to_csv(DESPESAS_FILE, index=False)
 
 
@@ -1279,7 +1400,26 @@ def carregar_cookies_salvos():
 # ==================== PRODUTOS & VENDAS ====================
 
 def carregar_produtos():
-    """Carrega produtos do arquivo JSON"""
+    """Carrega produtos do Google Sheets ou arquivo JSON local."""
+    try:
+        spreadsheet = get_spreadsheet()
+        if spreadsheet:
+            ws = spreadsheet.worksheet("Produtos")
+            data = ws.get_all_records()
+            if data:
+                # Converte tipos numéricos
+                for item in data:
+                    item['id'] = int(item.get('id', 0))
+                    item['quantidade_gramas'] = float(item.get('quantidade_gramas', 0))
+                    item['quantidade_inicial'] = float(item.get('quantidade_inicial', 0))
+                    item['preco_compra_total'] = float(item.get('preco_compra_total', 0))
+                    item['vendido_gramas'] = float(item.get('vendido_gramas', 0))
+                return data
+            return []
+    except:
+        pass
+    
+    # Fallback para arquivo local
     if os.path.exists(PRODUTOS_FILE):
         try:
             with open(PRODUTOS_FILE, 'r', encoding='utf-8') as f:
@@ -1290,13 +1430,57 @@ def carregar_produtos():
 
 
 def salvar_produtos(produtos):
-    """Salva produtos no arquivo JSON"""
+    """Salva produtos no Google Sheets ou arquivo JSON local."""
+    try:
+        spreadsheet = get_spreadsheet()
+        if spreadsheet:
+            ws = spreadsheet.worksheet("Produtos")
+            ws.clear()
+            # Header
+            ws.append_row(["id", "nome", "descricao", "quantidade_gramas", "quantidade_inicial", "preco_compra_total", "vendido_gramas", "data_cadastro"])
+            # Dados
+            for p in produtos:
+                ws.append_row([
+                    p.get('id', 0),
+                    p.get('nome', ''),
+                    p.get('descricao', ''),
+                    p.get('quantidade_gramas', 0),
+                    p.get('quantidade_inicial', 0),
+                    p.get('preco_compra_total', 0),
+                    p.get('vendido_gramas', 0),
+                    p.get('data_cadastro', '')
+                ])
+            return
+    except:
+        pass
+    
+    # Fallback para arquivo local
     with open(PRODUTOS_FILE, 'w', encoding='utf-8') as f:
         json.dump(produtos, f, indent=2, ensure_ascii=False)
 
 
 def carregar_vendas():
-    """Carrega vendas do arquivo JSON"""
+    """Carrega vendas do Google Sheets ou arquivo JSON local."""
+    try:
+        spreadsheet = get_spreadsheet()
+        if spreadsheet:
+            ws = spreadsheet.worksheet("Vendas")
+            data = ws.get_all_records()
+            if data:
+                # Converte tipos numéricos
+                for item in data:
+                    item['id'] = int(item.get('id', 0))
+                    item['produto_id'] = int(item.get('produto_id', 0))
+                    item['gramas'] = float(item.get('gramas', 0))
+                    item['valor_venda'] = float(item.get('valor_venda', 0))
+                    item['custo'] = float(item.get('custo', 0))
+                    item['lucro'] = float(item.get('lucro', 0))
+                return data
+            return []
+    except:
+        pass
+    
+    # Fallback para arquivo local
     if os.path.exists(VENDAS_FILE):
         try:
             with open(VENDAS_FILE, 'r', encoding='utf-8') as f:
@@ -1307,7 +1491,32 @@ def carregar_vendas():
 
 
 def salvar_vendas(vendas):
-    """Salva vendas no arquivo JSON"""
+    """Salva vendas no Google Sheets ou arquivo JSON local."""
+    try:
+        spreadsheet = get_spreadsheet()
+        if spreadsheet:
+            ws = spreadsheet.worksheet("Vendas")
+            ws.clear()
+            # Header
+            ws.append_row(["id", "produto_id", "produto_nome", "cliente", "gramas", "valor_venda", "custo", "lucro", "data"])
+            # Dados
+            for v in vendas:
+                ws.append_row([
+                    v.get('id', 0),
+                    v.get('produto_id', 0),
+                    v.get('produto_nome', ''),
+                    v.get('cliente', ''),
+                    v.get('gramas', 0),
+                    v.get('valor_venda', 0),
+                    v.get('custo', 0),
+                    v.get('lucro', 0),
+                    v.get('data', '')
+                ])
+            return
+    except:
+        pass
+    
+    # Fallback para arquivo local
     with open(VENDAS_FILE, 'w', encoding='utf-8') as f:
         json.dump(vendas, f, indent=2, ensure_ascii=False)
 
