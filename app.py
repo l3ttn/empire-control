@@ -2285,15 +2285,23 @@ with tab2:
         with st.form("form_produto", clear_on_submit=True):
             prod_nome = st.text_input("📝 Nome", placeholder="Ex: Creatina")
             prod_desc = st.text_area("💬 Descrição", placeholder="Ex: Creatina monohidratada pura", height=80)
-            prod_gramas = st.number_input("⚖️ Quantidade (gramas)", min_value=0, value=100, step=10)
-            prod_preco_compra = st.number_input("💰 Preço Compra Total (R$)", min_value=0.0, value=0.0, step=1.0)
+            prod_gramas = st.text_input("⚖️ Quantidade (gramas)", placeholder="Ex: 200")
+            prod_preco_compra = st.text_input("💰 Preço Compra Total (R$)", placeholder="Ex: 150")
 
             btn_add_prod = st.form_submit_button("✅ Adicionar Produto", use_container_width=True, type="primary")
 
-            if btn_add_prod and prod_nome and prod_gramas > 0:
-                novo_prod = adicionar_produto(prod_nome, prod_gramas, prod_preco_compra, prod_desc)
-                st.success(f"✅ {novo_prod['nome']} adicionado com sucesso!")
-                st.rerun()
+            if btn_add_prod and prod_nome:
+                try:
+                    gramas = float(prod_gramas.replace(',', '.')) if prod_gramas else 0
+                    preco = float(prod_preco_compra.replace(',', '.')) if prod_preco_compra else 0
+                    if gramas > 0:
+                        novo_prod = adicionar_produto(prod_nome, gramas, preco, prod_desc)
+                        st.success(f"✅ {novo_prod['nome']} adicionado com sucesso!")
+                        st.rerun()
+                    else:
+                        st.error("Informe a quantidade em gramas!")
+                except ValueError:
+                    st.error("Valores inválidos! Use apenas números.")
 
     # COLUNA 2: Registrar Venda
     with col_sell:
@@ -2316,8 +2324,17 @@ with tab2:
                     st.caption(f"💡 Custo por grama: R$ {custo_por_grama:.2f}/g")
 
                     venda_cliente = st.text_input("👤 Nome do Cliente", placeholder="Ex: João Silva")
-                    venda_gramas = st.number_input("⚖️ Gramas Vendidas", min_value=1, max_value=int(produto['quantidade_gramas']), value=10, step=5)
-                    preco_grama_venda = st.number_input("� Preço por Grama (R$)", min_value=0.0, value=0.0, step=0.50)
+                    venda_gramas_str = st.text_input("⚖️ Gramas Vendidas", placeholder="Ex: 10")
+                    preco_grama_venda_str = st.text_input("💵 Preço por Grama (R$)", placeholder="Ex: 25")
+
+                    # Parse inputs for preview
+                    try:
+                        venda_gramas = float(venda_gramas_str.replace(',', '.')) if venda_gramas_str else 0.0
+                        preco_grama_venda = float(preco_grama_venda_str.replace(',', '.')) if preco_grama_venda_str else 0.0
+                    except ValueError:
+                        venda_gramas = 0.0
+                        preco_grama_venda = 0.0
+                        st.warning("Valores de gramas ou preço inválidos para pré-visualização. Use apenas números.")
 
                     # Calcula valor total automaticamente
                     venda_valor = preco_grama_venda * venda_gramas
@@ -2337,8 +2354,12 @@ with tab2:
                     btn_vender = st.form_submit_button("✅ Confirmar Venda", use_container_width=True, type="primary")
 
                     if btn_vender:
-                        if preco_grama_venda <= 0:
+                        if venda_gramas <= 0:
+                            st.error("Informe a quantidade em gramas!")
+                        elif preco_grama_venda <= 0:
                             st.error("Informe o preço por grama!")
+                        elif venda_gramas > produto['quantidade_gramas']:
+                            st.error(f"Estoque insuficiente! Disponível: {produto['quantidade_gramas']}g")
                         else:
                             sucesso, msg = registrar_venda(produto_id, venda_gramas, venda_valor, venda_cliente)
                             if sucesso:
@@ -2346,6 +2367,7 @@ with tab2:
                                 st.rerun()
                             else:
                                 st.error(msg)
+
                 else:
                     st.warning("Nenhum produto com estoque disponível")
         else:
