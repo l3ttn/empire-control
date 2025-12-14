@@ -688,7 +688,7 @@ def fazer_login_playwright_stealth():
                 time.sleep(random.uniform(min_sec, max_sec))
 
             # Navega para homepage com timing humano
-            page.goto('https://br.platform.com', wait_until='networkidle')
+            page.goto('https://br.stripchat.com', wait_until='networkidle')
             human_delay(3, 6)
 
             # Scroll aleatorio (simula leitura)
@@ -789,7 +789,7 @@ def fazer_login_interativo():
 
         try:
             # Vai para homepage primeiro (comportamento humano)
-            driver.get('https://br.platform.com')
+            driver.get('https://br.stripchat.com')
             human_delay(3, 6)
 
             # Scroll aleatorio (simula leitura)
@@ -797,14 +797,14 @@ def fazer_login_interativo():
             human_delay(1, 2)
 
             # Agora vai para login
-            driver.get('https://br.platform.com/login')
+            driver.get('https://br.stripchat.com/login')
             human_delay(2, 4)
 
             st.info("Navegador aberto! Faca login manualmente e marque 'Confiar neste dispositivo'. Aguardando...")
 
             # Aguarda usuario fazer login
             WebDriverWait(driver, 300).until(
-                lambda d: 'earnings' in d.current_url or d.current_url == 'https://br.platform.com/'
+                lambda d: 'earnings' in d.current_url or d.current_url == 'https://br.stripchat.com/'
             )
 
             # Usuario logou! Salvar cookies
@@ -812,12 +812,12 @@ def fazer_login_interativo():
             human_delay(2, 4)
 
             # Vai para página de earnings
-            driver.get('https://br.platform.com/earnings/tokens-history')
+            driver.get('https://br.stripchat.com/earnings/tokens-history')
             human_delay(5, 8)
 
             # Extrai dados via JavaScript
             script = """
-            return fetch('https://br.platform.com/api/front/v3/config/initial?requestPath=%2Fearnings%2Ftokens-history')
+            return fetch('https://br.stripchat.com/api/front/v3/config/initial?requestPath=%2Fearnings%2Ftokens-history')
                 .then(r => r.json())
                 .then(d => d);
             """
@@ -879,19 +879,19 @@ def fetch_stipchat_stats_com_cookies_salvos():
 
         try:
             # Vai para site primeiro
-            driver.get('https://br.platform.com')
+            driver.get('https://br.stripchat.com')
             time.sleep(random.uniform(2, 4))
 
             # Carrega cookies salvos
             carregar_cookies(driver, COOKIES_FILE)
 
             # Vai para página de earnings
-            driver.get('https://br.platform.com/earnings/tokens-history')
+            driver.get('https://br.stripchat.com/earnings/tokens-history')
             time.sleep(random.uniform(4, 6))
 
             # Extrai dados via JavaScript
             script = """
-            return fetch('https://br.platform.com/api/front/v3/config/initial?requestPath=%2Fearnings%2Ftokens-history')
+            return fetch('https://br.stripchat.com/api/front/v3/config/initial?requestPath=%2Fearnings%2Ftokens-history')
                 .then(r => r.json())
                 .then(d => d);
             """
@@ -943,7 +943,7 @@ def fetch_stipchat_stats_selenium(username, password):
 
         try:
             # Acessa página de login
-            driver.get('https://br.platform.com/login')
+            driver.get('https://br.stripchat.com/login')
             time.sleep(3)
 
             # Faz login
@@ -965,12 +965,12 @@ def fetch_stipchat_stats_selenium(username, password):
             driver.execute_cdp_cmd('Network.enable', {})
 
             # Vai para página de earnings
-            driver.get('https://br.platform.com/earnings/tokens-history')
+            driver.get('https://br.stripchat.com/earnings/tokens-history')
             time.sleep(5)
 
             # Captura dados via JavaScript
             script = """
-            return fetch('https://br.platform.com/api/front/v3/config/initial?requestPath=%2Fearnings%2Ftokens-history')
+            return fetch('https://br.stripchat.com/api/front/v3/config/initial?requestPath=%2Fearnings%2Ftokens-history')
                 .then(r => r.json())
                 .then(d => d);
             """
@@ -1003,13 +1003,13 @@ def fetch_stipchat_stats_requests(session_key, all_cookies=None):
     Usa requests com TODOS os cookies do browser.
     """
     try:
-        url = "https://br.platform.com/api/front/v3/config/initial"
+        url = "https://br.stripchat.com/api/front/v3/config/initial"
 
         params = {'requestPath': '/earnings/tokens-history'}
 
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Referer': 'https://br.platform.com/earnings/tokens-history',
+            'Referer': 'https://br.stripchat.com/earnings/tokens-history',
             'Accept': 'application/json, text/plain, */*',
             'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
             'Accept-Encoding': 'gzip, deflate, br',
@@ -1071,7 +1071,7 @@ def fetch_transacoes_periodo(user_id, all_cookies, dias=30):
         from_date = inicio.strftime('%Y-%m-%dT%H:%M:%SZ')
 
         # Endpoint descoberto
-        url = f'https://br.platform.com/api/front/users/{user_id}/transactions'
+        url = f'https://br.stripchat.com/api/front/users/{user_id}/transactions'
 
         params = {
             'from': from_date,
@@ -1082,7 +1082,7 @@ def fetch_transacoes_periodo(user_id, all_cookies, dias=30):
 
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Referer': 'https://br.platform.com/earnings/tokens-history',
+            'Referer': 'https://br.stripchat.com/earnings/tokens-history',
             'Accept': 'application/json, text/plain, */*',
             'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
             'Accept-Encoding': 'gzip, deflate, br',
@@ -1312,7 +1312,7 @@ def salvar_vendas(vendas):
         json.dump(vendas, f, indent=2, ensure_ascii=False)
 
 
-def adicionar_produto(nome, quantidade_gramas, preco_compra, preco_venda, descricao=""):
+def adicionar_produto(nome, quantidade_gramas, preco_compra, descricao=""):
     """Adiciona novo produto ao estoque"""
     produtos = carregar_produtos()
     novo_produto = {
@@ -1322,7 +1322,6 @@ def adicionar_produto(nome, quantidade_gramas, preco_compra, preco_venda, descri
         'quantidade_gramas': quantidade_gramas,
         'quantidade_inicial': quantidade_gramas,
         'preco_compra_total': preco_compra,
-        'preco_venda_grama': preco_venda,
         'vendido_gramas': 0,
         'data_cadastro': datetime.now().isoformat()
     }
@@ -1331,7 +1330,7 @@ def adicionar_produto(nome, quantidade_gramas, preco_compra, preco_venda, descri
     return novo_produto
 
 
-def registrar_venda(produto_id, gramas_vendidas, valor_venda, observacao=""):
+def registrar_venda(produto_id, gramas_vendidas, valor_venda, cliente=""):
     """Registra uma venda parcial e atualiza estoque"""
     produtos = carregar_produtos()
     vendas = carregar_vendas()
@@ -1345,6 +1344,11 @@ def registrar_venda(produto_id, gramas_vendidas, valor_venda, observacao=""):
     if produto['quantidade_gramas'] < gramas_vendidas:
         return False, f"Estoque insuficiente. Disponível: {produto['quantidade_gramas']}g"
 
+    # Calcula custo proporcional e lucro
+    custo_por_grama = produto['preco_compra_total'] / produto['quantidade_inicial']
+    custo_venda = custo_por_grama * gramas_vendidas
+    lucro = valor_venda - custo_venda
+
     # Atualiza estoque
     produto['quantidade_gramas'] -= gramas_vendidas
     produto['vendido_gramas'] += gramas_vendidas
@@ -1354,9 +1358,11 @@ def registrar_venda(produto_id, gramas_vendidas, valor_venda, observacao=""):
         'id': len(vendas) + 1 if vendas else 1,
         'produto_id': produto_id,
         'produto_nome': produto['nome'],
+        'cliente': cliente,
         'gramas': gramas_vendidas,
-        'valor': valor_venda,
-        'observacao': observacao,
+        'valor_venda': valor_venda,
+        'custo': custo_venda,
+        'lucro': lucro,
         'data': datetime.now().isoformat()
     }
     vendas.append(nova_venda)
@@ -1413,23 +1419,23 @@ st.sidebar.markdown("## 💰 Calibracao Financeira")
 
 # Funcao para buscar cotacao USD/BRL da Binance
 @st.cache_data(ttl=300)  # Cache por 5 minutos
-def get_usdbrl_binance():
-    """Busca cotacao USD/BRL da Binance API"""
+def get_usdbrl():
+    """Busca cotacao USDC/BRL da Binance"""
     try:
-        response = requests.get('https://api.binance.com/api/v3/ticker/price?symbol=USDTBRL', timeout=5)
+        response = requests.get('https://api.binance.com/api/v3/ticker/price?symbol=USDCBRL', timeout=5)
         if response.status_code == 200:
             data = response.json()
             return float(data['price'])
         else:
-            return 6.00  # Fallback
+            return 5.40  # Fallback
     except:
-        return 6.00  # Fallback em caso de erro
+        return 5.40  # Fallback em caso de erro
 
 # Busca cotacao automatica
-cotacao_auto = get_usdbrl_binance()
+cotacao_auto = get_usdbrl()
 
-st.sidebar.markdown(f"### 💵 Dólar Hoje: **R$ {cotacao_auto:.2f}**")
-st.sidebar.caption("Cotação USDT/BRL via Binance (atualiza a cada 5 min)")
+st.sidebar.markdown(f"### 💵 USDC Hoje: **R$ {cotacao_auto:.2f}**")
+st.sidebar.caption("Cotação USDC/BRL Binance (atualiza a cada 5 min)")
 
 cotacao_dolar = cotacao_auto
 
@@ -2062,13 +2068,19 @@ with tab2:
             prod_desc = st.text_area("💬 Descrição", placeholder="Ex: Creatina monohidratada pura", height=80)
             prod_gramas = st.number_input("⚖️ Quantidade (gramas)", min_value=0, value=100, step=10)
             prod_preco_compra = st.number_input("💰 Preço Compra Total (R$)", min_value=0.0, value=0.0, step=1.0)
-            prod_preco_venda_g = st.number_input("💵 Preço Venda por Grama (R$)", min_value=0.0, value=0.0, step=0.01)
 
             btn_add_prod = st.form_submit_button("✅ Adicionar Produto", use_container_width=True, type="primary")
 
             if btn_add_prod and prod_nome and prod_gramas > 0:
-                adicionar_produto(prod_nome, prod_gramas, prod_preco_compra, prod_preco_venda_g, prod_desc)
-                st.success(f"{prod_nome} adicionado!")
+                novo_prod = adicionar_produto(prod_nome, prod_gramas, prod_preco_compra, prod_desc)
+                st.session_state.ultimo_produto_adicionado = novo_prod['nome']
+        
+        # Mostra mensagem de sucesso fora do form (persiste após submit)
+        if 'ultimo_produto_adicionado' in st.session_state and st.session_state.ultimo_produto_adicionado:
+            st.success(f"✅ {st.session_state.ultimo_produto_adicionado} adicionado com sucesso!")
+            # Limpa após mostrar (para não mostrar eternamente)
+            if st.button("🔄 Adicionar outro", key="limpar_msg_produto", use_container_width=True):
+                st.session_state.ultimo_produto_adicionado = None
                 st.rerun()
 
     # COLUNA 2: Registrar Venda
@@ -2087,21 +2099,41 @@ with tab2:
                     # Pega produto para mostrar info
                     produto = next(p for p in produtos if p['id'] == produto_id)
 
-                    st.caption(f"Preço sugerido: R$ {produto['preco_venda_grama']:.2f}/g")
+                    # Calcula custo por grama para referência
+                    custo_por_grama = produto['preco_compra_total'] / produto['quantidade_inicial'] if produto['quantidade_inicial'] > 0 else 0
+                    st.caption(f"💡 Custo por grama: R$ {custo_por_grama:.2f}/g")
 
+                    venda_cliente = st.text_input("👤 Nome do Cliente", placeholder="Ex: João Silva")
                     venda_gramas = st.number_input("⚖️ Gramas Vendidas", min_value=1, max_value=int(produto['quantidade_gramas']), value=10, step=5)
-                    venda_valor = st.number_input("💰 Valor da Venda (R$)", min_value=0.0, value=float(venda_gramas * produto['preco_venda_grama']), step=1.0)
-                    venda_obs = st.text_input("💬 Observação", placeholder="Ex: Cliente João, WhatsApp")
+                    preco_grama_venda = st.number_input("� Preço por Grama (R$)", min_value=0.0, value=0.0, step=0.50)
+
+                    # Calcula valor total automaticamente
+                    venda_valor = preco_grama_venda * venda_gramas
+
+                    # Preview do cálculo
+                    custo_estimado = custo_por_grama * venda_gramas
+                    lucro_estimado = venda_valor - custo_estimado
+                    cor_lucro = "green" if lucro_estimado >= 0 else "red"
+                    
+                    st.markdown(f"""
+                    **📊 Resumo da Venda:**
+                    - Valor Total: **R$ {venda_valor:.2f}** ({venda_gramas}g × R$ {preco_grama_venda:.2f})
+                    - Custo: R$ {custo_estimado:.2f}
+                    - Lucro: <span style='color: {cor_lucro}; font-weight: bold;'>R$ {lucro_estimado:.2f}</span>
+                    """, unsafe_allow_html=True)
 
                     btn_vender = st.form_submit_button("✅ Confirmar Venda", use_container_width=True, type="primary")
 
                     if btn_vender:
-                        sucesso, msg = registrar_venda(produto_id, venda_gramas, venda_valor, venda_obs)
-                        if sucesso:
-                            st.success(msg)
-                            st.rerun()
+                        if preco_grama_venda <= 0:
+                            st.error("Informe o preço por grama!")
                         else:
-                            st.error(msg)
+                            sucesso, msg = registrar_venda(produto_id, venda_gramas, venda_valor, venda_cliente)
+                            if sucesso:
+                                st.success(msg)
+                                st.rerun()
+                            else:
+                                st.error(msg)
                 else:
                     st.warning("Nenhum produto com estoque disponível")
         else:
@@ -2114,7 +2146,7 @@ with tab2:
         if produtos:
             # KPIs Gerais
             investimento_total = sum(p['preco_compra_total'] for p in produtos)
-            valor_vendido = sum(v['valor'] for v in vendas)
+            valor_vendido = sum(v['valor_venda'] for v in vendas)
             lucro_bruto = valor_vendido - sum(
                 (p['vendido_gramas'] / p['quantidade_inicial']) * p['preco_compra_total']
                 for p in produtos if p['quantidade_inicial'] > 0
@@ -2158,7 +2190,7 @@ with tab2:
                     'Estoque': f"{p['quantidade_gramas']}g",
                     'Vendido': f"{p['vendido_gramas']}g",
                     '% Vendido': f"{(p['vendido_gramas']/p['quantidade_inicial']*100):.0f}%" if p['quantidade_inicial'] > 0 else "0%",
-                    'R$/g': f"R$ {p['preco_venda_grama']:.2f}",
+                    'Custo/g': f"R$ {(p['preco_compra_total']/p['quantidade_inicial']):.2f}" if p['quantidade_inicial'] > 0 else "R$ 0.00",
                     'ID': p['id']
                 }
                 for p in produtos
@@ -2181,6 +2213,41 @@ with tab2:
 
         else:
             st.info("Nenhum produto cadastrado ainda")
+
+    # VENDAS: Histórico completo
+    st.markdown("---")
+    st.markdown("### 📊 Histórico de Vendas")
+
+    if vendas:
+        vendas_df = pd.DataFrame([
+            {
+                'Data': datetime.fromisoformat(v['data']).strftime('%d/%m/%Y %H:%M'),
+                'Cliente': v['cliente'] if v['cliente'] else '-',
+                'Produto': v['produto_nome'],
+                'Gramas': f"{v['gramas']}g",
+                'Valor': f"R$ {v['valor_venda']:.2f}",
+                'Custo': f"R$ {v['custo']:.2f}",
+                'Lucro': f"R$ {v['lucro']:.2f}"
+            }
+            for v in reversed(vendas)
+        ])
+
+        st.dataframe(vendas_df, use_container_width=True, hide_index=True)
+
+        # Resumo de lucro total
+        lucro_total = sum(v['lucro'] for v in vendas)
+        receita_total = sum(v['valor_venda'] for v in vendas)
+        custo_total = sum(v['custo'] for v in vendas)
+
+        col_l1, col_l2, col_l3 = st.columns(3)
+        with col_l1:
+            st.metric("💰 Receita Total", f"R$ {receita_total:.2f}")
+        with col_l2:
+            st.metric("💸 Custo Total", f"R$ {custo_total:.2f}")
+        with col_l3:
+            st.metric("📈 Lucro Líquido", f"R$ {lucro_total:.2f}")
+    else:
+        st.info("Nenhuma venda registrada ainda")
 
 # ==================== TAB 3: HOUSEHOLD EXPENSES ====================
 with tab3:
