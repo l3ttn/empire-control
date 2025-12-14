@@ -1447,19 +1447,19 @@ def salvar_produtos(produtos):
             ws = spreadsheet.worksheet("Produtos")
             ws.clear()
             # Header
-            ws.append_row(["id", "nome", "descricao", "quantidade_gramas", "quantidade_inicial", "preco_compra_total", "vendido_gramas", "data_cadastro"])
-            # Dados
+            ws.append_row(["id", "nome", "descricao", "quantidade_gramas", "quantidade_inicial", "preco_compra_total", "vendido_gramas", "data_cadastro"], value_input_option='RAW')
+            # Dados - usa RAW para preservar decimais corretamente
             for p in produtos:
                 ws.append_row([
                     p.get('id', 0),
                     p.get('nome', ''),
                     p.get('descricao', ''),
-                    p.get('quantidade_gramas', 0),
-                    p.get('quantidade_inicial', 0),
-                    p.get('preco_compra_total', 0),
-                    p.get('vendido_gramas', 0),
+                    float(p.get('quantidade_gramas', 0)),
+                    float(p.get('quantidade_inicial', 0)),
+                    float(p.get('preco_compra_total', 0)),
+                    float(p.get('vendido_gramas', 0)),
                     p.get('data_cadastro', '')
-                ])
+                ], value_input_option='RAW')
             return
     except:
         pass
@@ -1508,20 +1508,20 @@ def salvar_vendas(vendas):
             ws = spreadsheet.worksheet("Vendas")
             ws.clear()
             # Header
-            ws.append_row(["id", "produto_id", "produto_nome", "cliente", "gramas", "valor_venda", "custo", "lucro", "data"])
-            # Dados
+            ws.append_row(["id", "produto_id", "produto_nome", "cliente", "gramas", "valor_venda", "custo", "lucro", "data"], value_input_option='RAW')
+            # Dados - usa RAW para preservar decimais corretamente
             for v in vendas:
                 ws.append_row([
                     v.get('id', 0),
                     v.get('produto_id', 0),
                     v.get('produto_nome', ''),
                     v.get('cliente', ''),
-                    v.get('gramas', 0),
-                    v.get('valor_venda', 0),
-                    v.get('custo', 0),
-                    v.get('lucro', 0),
+                    float(v.get('gramas', 0)),
+                    float(v.get('valor_venda', 0)),
+                    float(v.get('custo', 0)),
+                    float(v.get('lucro', 0)),
                     v.get('data', '')
-                ])
+                ], value_input_option='RAW')
             return
     except:
         pass
