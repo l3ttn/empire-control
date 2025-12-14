@@ -21,7 +21,7 @@ _spreadsheet = None
 
 
 def get_gsheets_client():
-    """Conecta ao Google Sheets usando credenciais do arquivo JSON."""
+    """Conecta ao Google Sheets usando credenciais do JSON (env var ou arquivo)."""
     global _gspread_client
     
     if _gspread_client is not None:
@@ -31,20 +31,34 @@ def get_gsheets_client():
         import gspread
         from google.oauth2.service_account import Credentials
         
-        credentials_file = os.getenv("GSHEETS_CREDENTIALS_FILE", "gsheets_credentials.json")
-        if not os.path.exists(credentials_file):
-            logger.error(f"Credentials file not found: {credentials_file}")
-            return None
-        
         scopes = [
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive"
         ]
         
-        credentials = Credentials.from_service_account_file(
-            credentials_file,
-            scopes=scopes
-        )
+        # Primeiro tenta ler das variáveis de ambiente (Railway)
+        credentials_json = os.getenv("GSHEETS_CREDENTIALS_JSON")
+        
+        if credentials_json:
+            # Parse JSON da variável de ambiente
+            credentials_info = json.loads(credentials_json)
+            credentials = Credentials.from_service_account_info(
+                credentials_info,
+                scopes=scopes
+            )
+            logger.info("Using credentials from GSHEETS_CREDENTIALS_JSON env var")
+        else:
+            # Fallback para arquivo local (desenvolvimento)
+            credentials_file = os.getenv("GSHEETS_CREDENTIALS_FILE", "gsheets_credentials.json")
+            if not os.path.exists(credentials_file):
+                logger.error(f"Credentials file not found: {credentials_file}")
+                return None
+            
+            credentials = Credentials.from_service_account_file(
+                credentials_file,
+                scopes=scopes
+            )
+            logger.info(f"Using credentials from file: {credentials_file}")
         
         _gspread_client = gspread.authorize(credentials)
         logger.info("Google Sheets client initialized successfully")
