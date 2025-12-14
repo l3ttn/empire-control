@@ -1409,23 +1409,53 @@ def carregar_cookies_salvos():
 
 # ==================== PRODUTOS & VENDAS ====================
 
+def parse_float_br(valor):
+    """
+    Converte valor numérico que pode estar em formato BR (vírgula decimal).
+    Trata tanto float direto quanto string formatada.
+    """
+    if isinstance(valor, (int, float)):
+        return float(valor)
+    if not valor or valor == '':
+        return 0.0
+    # Converte string - remove pontos de milhar e troca vírgula por ponto
+    s = str(valor).strip()
+    # Se tem vírgula e ponto, assume formato BR (1.234,56)
+    if ',' in s and '.' in s:
+        s = s.replace('.', '').replace(',', '.')
+    # Se só tem vírgula, assume decimal BR (123,45)
+    elif ',' in s:
+        s = s.replace(',', '.')
+    try:
+        return float(s)
+    except:
+        return 0.0
+
+
 def carregar_produtos():
     """Carrega produtos do Google Sheets ou arquivo JSON local."""
     try:
         spreadsheet = get_spreadsheet()
         if spreadsheet:
             ws = spreadsheet.worksheet("Produtos")
-            data = ws.get_all_records()
-            if data:
-                # Converte tipos numéricos
-                for item in data:
-                    item['id'] = int(item.get('id', 0))
-                    item['quantidade_gramas'] = float(item.get('quantidade_gramas', 0))
-                    item['quantidade_inicial'] = float(item.get('quantidade_inicial', 0))
-                    item['preco_compra_total'] = float(item.get('preco_compra_total', 0))
-                    item['vendido_gramas'] = float(item.get('vendido_gramas', 0))
-                return data
-            return []
+            # Usa get_all_values para ter controle total sobre parsing
+            all_values = ws.get_all_values()
+            if len(all_values) <= 1:  # Só header ou vazio
+                return []
+            
+            headers = all_values[0]
+            data = []
+            for row in all_values[1:]:
+                if len(row) >= len(headers):
+                    item = dict(zip(headers, row))
+                    # Converte tipos numéricos com suporte a formato BR
+                    item['id'] = int(item.get('id', 0) or 0)
+                    item['quantidade_gramas'] = parse_float_br(item.get('quantidade_gramas', 0))
+                    item['quantidade_inicial'] = parse_float_br(item.get('quantidade_inicial', 0))
+                    item['preco_compra_total'] = parse_float_br(item.get('preco_compra_total', 0))
+                    item['vendido_gramas'] = parse_float_br(item.get('vendido_gramas', 0))
+                    data.append(item)
+            return data
     except:
         pass
     
@@ -1469,24 +1499,32 @@ def salvar_produtos(produtos):
         json.dump(produtos, f, indent=2, ensure_ascii=False)
 
 
+
 def carregar_vendas():
     """Carrega vendas do Google Sheets ou arquivo JSON local."""
     try:
         spreadsheet = get_spreadsheet()
         if spreadsheet:
             ws = spreadsheet.worksheet("Vendas")
-            data = ws.get_all_records()
-            if data:
-                # Converte tipos numéricos
-                for item in data:
-                    item['id'] = int(item.get('id', 0))
-                    item['produto_id'] = int(item.get('produto_id', 0))
-                    item['gramas'] = float(item.get('gramas', 0))
-                    item['valor_venda'] = float(item.get('valor_venda', 0))
-                    item['custo'] = float(item.get('custo', 0))
-                    item['lucro'] = float(item.get('lucro', 0))
-                return data
-            return []
+            # Usa get_all_values para ter controle total sobre parsing
+            all_values = ws.get_all_values()
+            if len(all_values) <= 1:  # Só header ou vazio
+                return []
+            
+            headers = all_values[0]
+            data = []
+            for row in all_values[1:]:
+                if len(row) >= len(headers):
+                    item = dict(zip(headers, row))
+                    # Converte tipos numéricos com suporte a formato BR
+                    item['id'] = int(item.get('id', 0) or 0)
+                    item['produto_id'] = int(item.get('produto_id', 0) or 0)
+                    item['gramas'] = parse_float_br(item.get('gramas', 0))
+                    item['valor_venda'] = parse_float_br(item.get('valor_venda', 0))
+                    item['custo'] = parse_float_br(item.get('custo', 0))
+                    item['lucro'] = parse_float_br(item.get('lucro', 0))
+                    data.append(item)
+            return data
     except:
         pass
     
