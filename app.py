@@ -141,6 +141,57 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ==================== SISTEMA DE LOGIN ====================
+def check_password():
+    """Verifica se o usuario esta autenticado."""
+    
+    def password_entered():
+        """Callback quando senha e digitada."""
+        # Verifica credenciais
+        usuarios = st.secrets.get("usuarios", {})
+        usuario_input = st.session_state.get("username", "")
+        senha_input = st.session_state.get("password", "")
+        
+        if usuario_input in usuarios and usuarios[usuario_input] == senha_input:
+            st.session_state["authenticated"] = True
+            st.session_state["current_user"] = usuario_input
+            del st.session_state["password"]  # Remove senha da memoria
+        else:
+            st.session_state["authenticated"] = False
+
+    # Se ja autenticado, retorna True
+    if st.session_state.get("authenticated", False):
+        return True
+
+    # Mostra tela de login
+    st.markdown("""
+    <div style="text-align: center; padding: 60px 20px;">
+        <h1 style="color: #00ff88; font-size: 3rem; margin-bottom: 10px;">💎 EMPIRE CONTROL 💎</h1>
+        <p style="color: #888; font-size: 1.2rem;">Financial Command Center</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        st.markdown("""
+        <div style="background: #1a1a1a; padding: 40px; border-radius: 16px; border: 1px solid #333;">
+        """, unsafe_allow_html=True)
+        
+        st.text_input("👤 Usuario", key="username")
+        st.text_input("🔑 Senha", type="password", key="password")
+        st.button("🚀 Entrar", on_click=password_entered, use_container_width=True, type="primary")
+        
+        if "authenticated" in st.session_state and not st.session_state["authenticated"]:
+            st.error("❌ Usuario ou senha incorretos")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    return False
+
+# Verifica autenticacao - bloqueia acesso se nao estiver logado
+if not check_password():
+    st.stop()
+
 # ==================== CSS DARK MODE HACKER/TRADER ====================
 st.markdown("""
 <style>
