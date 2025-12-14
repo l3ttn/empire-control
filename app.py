@@ -2761,8 +2761,31 @@ with tab4:
     if len(st.session_state.despesas_df) > 0:
         total_expenses = st.session_state.despesas_df['valor'].sum()
 
+    # 4. Bot Telegram Revenue (from VendasBot worksheet)
+    bot_revenue = 0
+    try:
+        spreadsheet = get_spreadsheet()
+        if spreadsheet:
+            try:
+                ws_bot = spreadsheet.worksheet("VendasBot")
+                all_bot_values = ws_bot.get_all_values()
+                if len(all_bot_values) > 1:
+                    headers = all_bot_values[0]
+                    valor_idx = headers.index("valor") if "valor" in headers else -1
+                    if valor_idx >= 0:
+                        for row in all_bot_values[1:]:
+                            if len(row) > valor_idx:
+                                try:
+                                    bot_revenue += float(str(row[valor_idx]).replace(',', '.'))
+                                except:
+                                    pass
+            except:
+                pass  # VendasBot sheet may not exist yet
+    except:
+        pass
+
     # GRAND TOTAL LOGIC
-    grand_total = stipchat_revenue + stock_profit - total_expenses
+    grand_total = stipchat_revenue + stock_profit + bot_revenue - total_expenses
 
     # Display Grand Total
     st.markdown("#### 💎 GRAND TOTAL (Lucro Global)")
@@ -2797,12 +2820,12 @@ with tab4:
     # Breakdown por fonte
     st.markdown("#### 📊 Breakdown por Fonte")
 
-    col_b1, col_b2, col_b3 = st.columns(3)
+    col_b1, col_b2, col_b3, col_b4 = st.columns(4)
 
     with col_b1:
         st.markdown(f"""
         <div class="kpi-card">
-            <p class="kpi-title">🔴 REVENUE REVENUE</p>
+            <p class="kpi-title">🔴 STRIPCHAT REVENUE</p>
             <p class="kpi-value-green">R$ {stipchat_revenue:,.2f}</p>
         </div>
         """, unsafe_allow_html=True)
@@ -2816,6 +2839,14 @@ with tab4:
         """, unsafe_allow_html=True)
 
     with col_b3:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <p class="kpi-title">🤖 BOT TELEGRAM</p>
+            <p class="kpi-value-blue">R$ {bot_revenue:,.2f}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_b4:
         st.markdown(f"""
         <div class="kpi-card">
             <p class="kpi-title">💸 TOTAL EXPENSES</p>
