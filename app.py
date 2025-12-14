@@ -75,7 +75,12 @@ def get_spreadsheet():
     """
     Abre a planilha configurada nos secrets.
     Cria as abas necessárias se não existirem.
+    Usa cache para evitar múltiplas requisições.
     """
+    # Usa cache no session_state para evitar múltiplas conexões
+    if 'gsheets_spreadsheet' in st.session_state and st.session_state.gsheets_spreadsheet:
+        return st.session_state.gsheets_spreadsheet
+    
     try:
         client = get_google_sheets_client()
         if not client:
@@ -106,6 +111,8 @@ def get_spreadsheet():
             ws = spreadsheet.worksheet("Despesas")
             ws.append_row(["data", "item", "valor", "pagador"])
         
+        # Armazena em cache
+        st.session_state.gsheets_spreadsheet = spreadsheet
         return spreadsheet
     except Exception as e:
         st.error(f"Erro ao conectar Google Sheets: {e}")
