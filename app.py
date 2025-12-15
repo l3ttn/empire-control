@@ -1464,6 +1464,89 @@ def salvar_despesas(df):
     df.to_csv(DESPESAS_FILE, index=False)
 
 
+# ============ DESPESAS PESSOAIS DOS SOCIOS ============
+
+def carregar_despesas_pessoais():
+    """Carrega despesas pessoais do Google Sheets (aba DespesasPessoais)."""
+    try:
+        spreadsheet = get_spreadsheet()
+        if spreadsheet:
+            # Verifica se a aba existe, se nao cria
+            try:
+                ws = spreadsheet.worksheet("DespesasPessoais")
+            except:
+                ws = spreadsheet.add_worksheet(title="DespesasPessoais", rows=1000, cols=10)
+                ws.append_row(['data', 'descricao', 'valor', 'socio', 'categoria'])
+            
+            data = ws.get_all_records()
+            if data:
+                df = pd.DataFrame(data)
+                if 'data' in df.columns:
+                    df['data'] = pd.to_datetime(df['data']).dt.date
+                if 'valor' in df.columns:
+                    df['valor'] = df['valor'].apply(lambda x: float(str(x).replace(',', '.')) if x else 0.0)
+                return df
+            return pd.DataFrame(columns=['data', 'descricao', 'valor', 'socio', 'categoria'])
+    except Exception as e:
+        pass
+    
+    return pd.DataFrame(columns=['data', 'descricao', 'valor', 'socio', 'categoria'])
+
+
+def salvar_despesa_pessoal(data, descricao, valor, socio, categoria="Geral"):
+    """Adiciona uma nova despesa pessoal no Google Sheets."""
+    try:
+        spreadsheet = get_spreadsheet()
+        if spreadsheet:
+            try:
+                ws = spreadsheet.worksheet("DespesasPessoais")
+            except:
+                ws = spreadsheet.add_worksheet(title="DespesasPessoais", rows=1000, cols=10)
+                ws.append_row(['data', 'descricao', 'valor', 'socio', 'categoria'])
+            
+            ws.append_row([
+                str(data),
+                descricao,
+                float(valor),
+                socio,
+                categoria
+            ], value_input_option='RAW')
+            return True
+    except Exception as e:
+        pass
+    return False
+
+
+def limpar_despesas_pessoais_socio(socio):
+    """Limpa todas as despesas pessoais de um socio."""
+    try:
+        spreadsheet = get_spreadsheet()
+        if spreadsheet:
+            ws = spreadsheet.worksheet("DespesasPessoais")
+            all_data = ws.get_all_values()
+            
+            if len(all_data) <= 1:
+                return True
+            
+            # Filtra mantendo apenas despesas de outros socios
+            header = all_data[0]
+            socio_idx = header.index('socio') if 'socio' in header else 3
+            
+            new_data = [header]
+            for row in all_data[1:]:
+                if len(row) > socio_idx and row[socio_idx] != socio:
+                    new_data.append(row)
+            
+            ws.clear()
+            for row in new_data:
+                ws.append_row(row)
+            
+            return True
+    except:
+        pass
+    return False
+
+
 def salvar_cookies(cookies_dict):
     """Salva cookies em arquivo JSON local"""
     COOKIES_FILE = 'cookies_saved.json'
@@ -1483,7 +1566,7 @@ def carregar_cookies_salvos():
     return None
 
 
-# ==================== PRODUTOS & VENDAS ====================
+
 
 def parse_float_br(valor):
     """
@@ -1778,11 +1861,12 @@ st.sidebar.markdown(f"**🪙 1 Token = R$ {0.05 * cotacao_dolar:.2f}**")
 st.sidebar.markdown(f"**🎯 Meta Diária = $100 USD**")
 
 # ==================== TABS ====================
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🔴 REVENUE API",
     "📦 INVENTORY (STOCK)",
     "🏠 HOUSEHOLD EXPENSES",
-    "📊 EXECUTIVE DASHBOARD"
+    "📊 EXECUTIVE DASHBOARD",
+    "👥 CONTAS PESSOAIS"
 ])
 
 # ==================== TAB 1: REVENUE API ====================
@@ -2979,6 +3063,165 @@ with tab4:
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Nenhuma receita registrada ainda")
+
+# ==================== TAB 5: CONTAS PESSOAIS ====================
+with tab5:
+    st.markdown("### 👥 Contas Pessoais dos Sócios")
+    st.markdown("Controle individual de despesas fixas - **não afeta o caixa da empresa**")
+    
+    # Calcula lucro para dividir 50/50
+    lucro_empresa = 0
+    if st.session_state.stipchat_data:
+        tokens = st.session_state.stipchat_data['tokens']
+        lucro_empresa += tokens * 0.05 * cotacao_dolar
+    
+    vendas_calculo = carregar_vendas()
+    if vendas_calculo:
+        lucro_empresa += sum(v.get('lucro', 0) for v in vendas_calculo)
+    
+    # Subtrai despesas da empresa
+    if len(st.session_state.despesas_df) > 0:
+        lucro_empresa -= st.session_state.despesas_df['valor'].sum()
+    
+    parte_cada = lucro_empresa / 2
+    
+    # Header com o lucro distribuido
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, rgba(30,30,30,0.9), rgba(50,50,50,0.7)); 
+                border-radius: 15px; padding: 20px; margin-bottom: 20px; border: 1px solid #333;">
+        <h4 style="color: #ffd700; margin: 0 0 10px 0;">💰 Distribuição do Lucro (50/50)</h4>
+        <p style="color: #888; margin: 0;">Lucro Líquido da Empresa: <span style="color: #00ff88; font-weight: bold;">R$ {lucro_empresa:,.2f}</span></p>
+        <p style="color: #888; margin: 5px 0 0 0;">Cada sócio recebe: <span style="color: #00ff88; font-weight: bold;">R$ {parte_cada:,.2f}</span></p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Carrega despesas pessoais
+    despesas_pessoais_df = carregar_despesas_pessoais()
+    
+    # Separa por socio
+    despesas_lkz = despesas_pessoais_df[despesas_pessoais_df['socio'] == 'LKZ'] if len(despesas_pessoais_df) > 0 else pd.DataFrame()
+    despesas_nad = despesas_pessoais_df[despesas_pessoais_df['socio'] == 'NAD'] if len(despesas_pessoais_df) > 0 else pd.DataFrame()
+    
+    total_lkz = despesas_lkz['valor'].sum() if len(despesas_lkz) > 0 else 0
+    total_nad = despesas_nad['valor'].sum() if len(despesas_nad) > 0 else 0
+    
+    sobra_lkz = parte_cada - total_lkz
+    sobra_nad = parte_cada - total_nad
+    
+    # Duas colunas para cada socio
+    col_lkz, col_nad = st.columns(2)
+    
+    # ===== COLUNA LKZ =====
+    with col_lkz:
+        st.markdown("""
+        <div style="background: rgba(0,100,200,0.1); border-radius: 10px; padding: 15px; border: 1px solid rgba(0,100,200,0.3);">
+            <h4 style="color: #00aaff; margin: 0;">👤 LKZ</h4>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Resumo financeiro
+        st.markdown(f"""
+        <div style="margin: 15px 0;">
+            <p style="color: #888; margin: 5px 0;">Recebido: <span style="color: #00ff88;">R$ {parte_cada:,.2f}</span></p>
+            <p style="color: #888; margin: 5px 0;">Despesas: <span style="color: #ff4444;">R$ {total_lkz:,.2f}</span></p>
+            <p style="color: #fff; margin: 5px 0; font-weight: bold;">Sobra: <span style="color: {'#00ff88' if sobra_lkz >= 0 else '#ff4444'};">R$ {sobra_lkz:,.2f}</span></p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Formulario para adicionar despesa
+        with st.expander("➕ Adicionar Despesa LKZ"):
+            with st.form("form_desp_lkz", clear_on_submit=True):
+                lkz_data = st.date_input("📅 Data", value=date.today(), key="lkz_data")
+                lkz_desc = st.text_input("📝 Descrição", key="lkz_desc")
+                lkz_valor = st.number_input("💰 Valor (R$)", min_value=0.0, step=10.0, key="lkz_valor")
+                lkz_cat = st.selectbox("📁 Categoria", ["Moradia", "Alimentação", "Transporte", "Lazer", "Saúde", "Outros"], key="lkz_cat")
+                
+                if st.form_submit_button("💾 Salvar", type="primary"):
+                    if lkz_desc and lkz_valor > 0:
+                        if salvar_despesa_pessoal(lkz_data, lkz_desc, lkz_valor, "LKZ", lkz_cat):
+                            st.success("Despesa salva!")
+                            st.rerun()
+                        else:
+                            st.error("Erro ao salvar")
+        
+        # Lista de despesas
+        if len(despesas_lkz) > 0:
+            st.markdown("**📋 Histórico:**")
+            display_lkz = despesas_lkz.sort_values('data', ascending=False) if 'data' in despesas_lkz.columns else despesas_lkz
+            st.dataframe(
+                display_lkz[['data', 'descricao', 'valor', 'categoria']],
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "data": st.column_config.DateColumn("📅"),
+                    "descricao": st.column_config.TextColumn("📝 Item"),
+                    "valor": st.column_config.NumberColumn("💰", format="R$ %.2f"),
+                    "categoria": st.column_config.TextColumn("📁")
+                }
+            )
+            
+            if st.button("🗑️ Limpar Todas (LKZ)", key="limpar_lkz"):
+                if limpar_despesas_pessoais_socio("LKZ"):
+                    st.success("Despesas de LKZ limpas!")
+                    st.rerun()
+        else:
+            st.info("Nenhuma despesa registrada")
+    
+    # ===== COLUNA NAD =====
+    with col_nad:
+        st.markdown("""
+        <div style="background: rgba(200,100,0,0.1); border-radius: 10px; padding: 15px; border: 1px solid rgba(200,100,0,0.3);">
+            <h4 style="color: #ffaa00; margin: 0;">👤 NAD</h4>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Resumo financeiro
+        st.markdown(f"""
+        <div style="margin: 15px 0;">
+            <p style="color: #888; margin: 5px 0;">Recebido: <span style="color: #00ff88;">R$ {parte_cada:,.2f}</span></p>
+            <p style="color: #888; margin: 5px 0;">Despesas: <span style="color: #ff4444;">R$ {total_nad:,.2f}</span></p>
+            <p style="color: #fff; margin: 5px 0; font-weight: bold;">Sobra: <span style="color: {'#00ff88' if sobra_nad >= 0 else '#ff4444'};">R$ {sobra_nad:,.2f}</span></p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Formulario para adicionar despesa
+        with st.expander("➕ Adicionar Despesa NAD"):
+            with st.form("form_desp_nad", clear_on_submit=True):
+                nad_data = st.date_input("📅 Data", value=date.today(), key="nad_data")
+                nad_desc = st.text_input("📝 Descrição", key="nad_desc")
+                nad_valor = st.number_input("💰 Valor (R$)", min_value=0.0, step=10.0, key="nad_valor")
+                nad_cat = st.selectbox("📁 Categoria", ["Moradia", "Alimentação", "Transporte", "Lazer", "Saúde", "Outros"], key="nad_cat")
+                
+                if st.form_submit_button("💾 Salvar", type="primary"):
+                    if nad_desc and nad_valor > 0:
+                        if salvar_despesa_pessoal(nad_data, nad_desc, nad_valor, "NAD", nad_cat):
+                            st.success("Despesa salva!")
+                            st.rerun()
+                        else:
+                            st.error("Erro ao salvar")
+        
+        # Lista de despesas
+        if len(despesas_nad) > 0:
+            st.markdown("**📋 Histórico:**")
+            display_nad = despesas_nad.sort_values('data', ascending=False) if 'data' in despesas_nad.columns else despesas_nad
+            st.dataframe(
+                display_nad[['data', 'descricao', 'valor', 'categoria']],
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "data": st.column_config.DateColumn("📅"),
+                    "descricao": st.column_config.TextColumn("📝 Item"),
+                    "valor": st.column_config.NumberColumn("💰", format="R$ %.2f"),
+                    "categoria": st.column_config.TextColumn("📁")
+                }
+            )
+            
+            if st.button("🗑️ Limpar Todas (NAD)", key="limpar_nad"):
+                if limpar_despesas_pessoais_socio("NAD"):
+                    st.success("Despesas de NAD limpas!")
+                    st.rerun()
+        else:
+            st.info("Nenhuma despesa registrada")
 
 # ==================== FOOTER ====================
 st.markdown("---")
