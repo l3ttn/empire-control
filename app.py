@@ -1209,6 +1209,7 @@ def fetch_transacoes_periodo(user_id, all_cookies, dias=30):
     """
     Busca transacoes detalhadas dos ultimos N dias.
     Endpoint: /api/front/users/{userId}/transactions
+    AGORA COM PAGINACAO COMPLETA!
     """
     try:
         # Calcula datas
@@ -1224,13 +1225,6 @@ def fetch_transacoes_periodo(user_id, all_cookies, dias=30):
         # Endpoint descoberto
         url = f'https://br.stripchat.com/api/front/users/{user_id}/transactions'
 
-        params = {
-            'from': from_date,
-            'until': until,
-            'offset': 0,
-            'limit': 200  # Maximo permitido pela API
-        }
-
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://br.stripchat.com/earnings/tokens-history',
@@ -1243,30 +1237,61 @@ def fetch_transacoes_periodo(user_id, all_cookies, dias=30):
             'Sec-Fetch-Site': 'same-origin'
         }
 
-        response = requests.get(url, headers=headers, cookies=all_cookies, params=params, timeout=15)
-
-        if response.status_code == 200:
-            data = response.json()
-            transacoes = data.get('transactions', [])
-
-            return {
-                'success': True,
-                'transacoes': transacoes,
-                'total': len(transacoes)
+        # PAGINACAO: busca todas as transacoes
+        todas_transacoes = []
+        offset = 0
+        limit = 200  # Maximo permitido pela API
+        max_paginas = 50  # Limite de seguranca (10000 transacoes max)
+        
+        for pagina in range(max_paginas):
+            params = {
+                'from': from_date,
+                'until': until,
+                'offset': offset,
+                'limit': limit
             }
-        else:
-            # Debug: captura resposta de erro
-            try:
-                error_body = response.text[:500]  # Primeiros 500 chars
-            except:
-                error_body = "Não foi possível ler corpo da resposta"
 
-            return {
-                'success': False,
-                'error': f'Status {response.status_code}',
-                'details': error_body,
-                'url': response.url
-            }
+            response = requests.get(url, headers=headers, cookies=all_cookies, params=params, timeout=15)
+
+            if response.status_code == 200:
+                data = response.json()
+                transacoes = data.get('transactions', [])
+                
+                if not transacoes:  # Sem mais transacoes
+                    break
+                    
+                todas_transacoes.extend(transacoes)
+                
+                # Se retornou menos que o limit, nao ha mais paginas
+                if len(transacoes) < limit:
+                    break
+                    
+                offset += limit  # Proxima pagina
+                
+            else:
+                # Erro na requisicao mas ja temos algumas transacoes
+                if todas_transacoes:
+                    break
+                    
+                # Debug: captura resposta de erro
+                try:
+                    error_body = response.text[:500]
+                except:
+                    error_body = "Não foi possível ler corpo da resposta"
+
+                return {
+                    'success': False,
+                    'error': f'Status {response.status_code}',
+                    'details': error_body,
+                    'url': response.url
+                }
+
+        return {
+            'success': True,
+            'transacoes': todas_transacoes,
+            'total': len(todas_transacoes),
+            'paginas': pagina + 1
+        }
 
     except Exception as e:
         return {
