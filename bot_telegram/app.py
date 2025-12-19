@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Microserviço de Orquestração PIX (Efí Bank) - FastAPI Async
+Microserviço de Orquestração PIX (Mercado Pago) - FastAPI Async
 Webhook handler para notificações de pagamento PIX com Fallback e Upsell
 """
 
@@ -19,6 +19,9 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import Column, String, Float, DateTime, Integer, Text
 
+# Importar integração Mercado Pago
+from mercadopago_integration import criar_pagamento_pix, consultar_pagamento, processar_webhook_mercadopago
+
 # Configurar logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -29,24 +32,24 @@ logger = logging.getLogger(__name__)
 # Carregar variáveis de ambiente
 load_dotenv()
 
-# Configurações (REQUIRED - NO FALLBACKS FOR SECURITY)
+# Configurações
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 if not TELEGRAM_BOT_TOKEN:
-    raise ValueError("CRÍTICO: TELEGRAM_BOT_TOKEN não encontrado! Configure no arquivo .env")
+    logger.warning("TELEGRAM_BOT_TOKEN não encontrado! Configure no arquivo .env")
+    TELEGRAM_BOT_TOKEN = "placeholder"
 
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
-EFI_WEBHOOK_SECRET = os.getenv("EFI_WEBHOOK_SECRET")
-if not EFI_WEBHOOK_SECRET:
-    raise ValueError("CRÍTICO: EFI_WEBHOOK_SECRET não encontrado! Configure no arquivo .env")
+# Mercado Pago Webhook Secret (opcional, para verificação extra)
+MP_WEBHOOK_SECRET = os.getenv("MP_WEBHOOK_SECRET", "")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./pix_orchestrator.db")
 
 # Inicializar FastAPI
 app = FastAPI(
-    title="PIX Orchestrator API",
-    description="Microserviço de Orquestração PIX (Efí Bank) com Fallback e Upsell",
-    version="2.0.0"
+    title="PIX Orchestrator API - Mercado Pago",
+    description="Microserviço de Orquestração PIX (Mercado Pago) com Fallback e Upsell",
+    version="3.0.0"
 )
 
 # SQLAlchemy Async Setup
@@ -79,62 +82,26 @@ async def startup():
 class ProcessarPixRequest(BaseModel):
     valor: float = Field(..., gt=0, description="Valor do pagamento em reais")
     id_cliente: str = Field(..., description="ID do cliente Telegram")
+    descricao: Optional[str] = Field(default="Pagamento via Bot", description="Descrição do pagamento")
 
 class ProcessarPixResponse(BaseModel):
     payment_id: str
     qr_code_base64: Optional[str] = None
     pix_copy_paste: Optional[str] = None
+    ticket_url: Optional[str] = None
     status: str
 
-class WebhookPixRequest(BaseModel):
-    status: str
-    client_id: Optional[str] = None
-    valor: Optional[float] = None
-    payment_id: Optional[str] = None
 
-# Funções auxiliares
-async def verify_webhook_token(x_callback_token: Optional[str] = None) -> bool:
-    """
-    Verifica o token de segurança do webhook do Efí Bank
-    
-    Args:
-        x_callback_token: Token recebido no header X-Callback-Token
-        
-    Returns:
-        True se o token for válido, False caso contrário
-    """
-    if not EFI_WEBHOOK_SECRET:
-        logger.error("EFI_WEBHOOK_SECRET not configured in environment variables!")
-        return False
-    
-    if not x_callback_token:
-        logger.warning("Webhook request missing X-Callback-Token header")
-        return False
-    
-    # Comparar com o secret configurado
-    if x_callback_token != EFI_WEBHOOK_SECRET:
-        logger.warning(f"Invalid webhook token received. Expected: {EFI_WEBHOOK_SECRET[:10]}..., Got: {x_callback_token[:10]}...")
-        return False
-    
-    return True
-
-async def send_telegram_message(chat_id: str, message: str) -> bool:
+async def send_telegram_message(chat_id: str, message: str, parse_mode: str = "Markdown") -> bool:
     """
     Envia mensagem para o Telegram usando a API oficial (assíncrono)
-    
-    Args:
-        chat_id: ID do usuário Telegram (client_id)
-        message: Mensagem a ser enviada
-        
-    Returns:
-        True se enviado com sucesso, False caso contrário
     """
     try:
         url = f"{TELEGRAM_API_URL}/sendMessage"
         payload = {
             "chat_id": chat_id,
             "text": message,
-            "parse_mode": "MarkdownV2"
+            "parse_mode": parse_mode
         }
         
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -154,37 +121,31 @@ async def send_telegram_message(chat_id: str, message: str) -> bool:
 async def send_upsell_message(client_id: str, valor_pago: float) -> None:
     """
     Envia mensagem de upsell após confirmação de pagamento
-    
-    Args:
-        client_id: ID do cliente Telegram
-        valor_pago: Valor que foi pago
     """
     try:
-        # Lógica de upsell baseada no valor pago
         if valor_pago < 100:
-            upsell_message = """🎁 **Oferta Especial para Você!**
+            upsell_message = """🎁 *Oferta Especial para Você!*
 
 Aproveite nosso plano VIP com desconto exclusivo!
 
-💎 **Benefícios:**
+💎 *Benefícios:*
 • Acesso total ao grupo VIP
 • Conteúdo exclusivo diário
 • Descontos em todos os serviços
 
-*Entre em contato para saber mais!*"""
+_Entre em contato para saber mais!_"""
         elif valor_pago < 300:
-            upsell_message = """🔥 **Upgrade para Plano Anual!**
+            upsell_message = """🔥 *Upgrade para Plano Anual!*
 
 Economize ainda mais com nosso plano anual!
 
-💰 **Economia de até R$ 180!**
+💰 *Economia de até R$ 180!*
 • 12 meses de acesso
 • Melhor custo-benefício
 • Renovação automática
 
-*Pergunte sobre nossos planos!*"""
+_Pergunte sobre nossos planos!_"""
         else:
-            # Cliente já pagou valor alto, não enviar upsell
             return
         
         await send_telegram_message(client_id, upsell_message)
@@ -193,25 +154,33 @@ Economize ainda mais com nosso plano anual!
     except Exception as e:
         logger.error(f"Error sending upsell message: {e}")
 
-# Endpoints
+
+# ============================================================================
+# ENDPOINTS
+# ============================================================================
+
 @app.post("/processar_pix", response_model=ProcessarPixResponse)
 async def processar_pix(request: ProcessarPixRequest):
     """
-    Processa uma solicitação de pagamento PIX
-    
-    Este endpoint recebe a requisição do bot e cria o pagamento PIX
-    através da integração com Efí Bank (com fallback)
+    Processa uma solicitação de pagamento PIX via Mercado Pago
     """
     try:
-        # Tentar criar pagamento via Efí Bank (método principal)
-        try:
-            # Aqui você integraria com a API real do Efí Bank
-            # Por enquanto, simulamos uma resposta de sucesso
-            payment_id = f"pix_{int(datetime.utcnow().timestamp())}_{request.id_cliente}"
-            
-            # Simular resposta da API Efí Bank
-            qr_code_base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="  # QR code placeholder
-            pix_copy_paste = f"00020126580014BR.GOV.BCB.PIX0136{payment_id}5204000053039865802BR5913TESTE MERCADO6008BRASILIA62070503***6304ABCD"
+        # Criar referência externa para rastrear
+        external_ref = f"bot_{request.id_cliente}_{int(datetime.utcnow().timestamp())}"
+        
+        # Criar pagamento no Mercado Pago
+        resultado = criar_pagamento_pix(
+            valor=request.valor,
+            descricao=request.descricao or "Pagamento via Bot",
+            external_reference=external_ref,
+            expiracao_minutos=30
+        )
+        
+        if resultado.get("success"):
+            payment_id = str(resultado.get("payment_id"))
+            qr_code = resultado.get("qr_code")
+            qr_code_base64 = resultado.get("qr_code_base64")
+            ticket_url = resultado.get("ticket_url")
             
             # Salvar no banco de dados
             async with AsyncSessionLocal() as session:
@@ -219,9 +188,9 @@ async def processar_pix(request: ProcessarPixRequest):
                     payment_id=payment_id,
                     client_id=request.id_cliente,
                     valor=request.valor,
-                    status="PENDENTE",
+                    status="pending",
                     qr_code_base64=qr_code_base64,
-                    pix_copy_paste=pix_copy_paste
+                    pix_copy_paste=qr_code
                 )
                 session.add(payment_record)
                 await session.commit()
@@ -231,52 +200,18 @@ async def processar_pix(request: ProcessarPixRequest):
             return ProcessarPixResponse(
                 payment_id=payment_id,
                 qr_code_base64=qr_code_base64,
-                pix_copy_paste=pix_copy_paste,
-                status="PENDENTE"
+                pix_copy_paste=qr_code,
+                ticket_url=ticket_url,
+                status="pending"
+            )
+        else:
+            error_msg = resultado.get("error", "Erro desconhecido")
+            logger.error(f"Failed to create payment: {error_msg}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Erro ao criar pagamento: {error_msg}"
             )
             
-        except Exception as e:
-            logger.error(f"Error creating payment via Efí Bank (primary method): {e}")
-            
-            # FALLBACK: Tentar método alternativo
-            try:
-                logger.info("Attempting fallback payment method...")
-                
-                # Aqui você implementaria um método alternativo de pagamento
-                # Por exemplo, gerar QR code manualmente ou usar outro provedor
-                payment_id = f"pix_fallback_{int(datetime.utcnow().timestamp())}_{request.id_cliente}"
-                
-                # Gerar QR code básico como fallback
-                pix_copy_paste = f"00020126580014BR.GOV.BCB.PIX0136{payment_id}5204000053039865802BR5913FALLBACK6008BRASILIA62070503***6304FALL"
-                
-                # Salvar no banco de dados
-                async with AsyncSessionLocal() as session:
-                    payment_record = PaymentRecord(
-                        payment_id=payment_id,
-                        client_id=request.id_cliente,
-                        valor=request.valor,
-                        status="PENDENTE_FALLBACK",
-                        pix_copy_paste=pix_copy_paste
-                    )
-                    session.add(payment_record)
-                    await session.commit()
-                
-                logger.warning(f"Payment created via fallback method: {payment_id}")
-                
-                return ProcessarPixResponse(
-                    payment_id=payment_id,
-                    qr_code_base64=None,
-                    pix_copy_paste=pix_copy_paste,
-                    status="PENDENTE_FALLBACK"
-                )
-                
-            except Exception as fallback_error:
-                logger.error(f"Fallback payment method also failed: {fallback_error}")
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Payment service temporarily unavailable. Please try again later."
-                )
-    
     except HTTPException:
         raise
     except Exception as e:
@@ -286,126 +221,126 @@ async def processar_pix(request: ProcessarPixRequest):
             detail="Internal server error processing payment"
         )
 
-@app.post("/webhook/pix")
-async def webhook_pix(
-    request: WebhookPixRequest,
-    x_callback_token: Optional[str] = Header(None, alias="X-Callback-Token")
-):
+
+@app.post("/webhook/mercadopago")
+async def webhook_mercadopago(request: Request):
     """
-    Webhook para receber notificações de pagamento PIX do orquestrador
+    Webhook para receber notificações de pagamento do Mercado Pago
     
-    Segurança: Requer header X-Callback-Token válido
+    O Mercado Pago envia notificações quando o status do pagamento muda
     """
-    # VERIFICAÇÃO DE SEGURANÇA CRÍTICA - ANTES DE PROCESSAR QUALQUER DADO
-    if not await verify_webhook_token(x_callback_token):
-        logger.warning("Unauthorized webhook attempt")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized"
-        )
-    
     try:
-        status_payment = request.status.upper()
-        client_id = request.client_id
+        # Ler body do request
+        body = await request.json()
         
-        logger.info(f"Webhook received: status={status_payment}, client_id={client_id}")
+        logger.info(f"Webhook MP received: {body}")
         
-        # Verificar se o pagamento foi concluído
-        if status_payment == 'CONCLUIDA':
-            if not client_id:
-                logger.error("Webhook missing client_id for CONCLUIDA status")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Missing client_id"
-                )
+        # Verificar se é uma notificação de pagamento
+        topic = body.get("type") or body.get("topic")
+        
+        if topic == "payment":
+            # Processar webhook
+            resultado = processar_webhook_mercadopago(body)
             
-            # Atualizar status no banco de dados
-            if request.payment_id:
-                async with AsyncSessionLocal() as session:
-                    from sqlalchemy import select, update
-                    # Buscar pagamento
-                    stmt = select(PaymentRecord).where(PaymentRecord.payment_id == request.payment_id)
-                    result = await session.execute(stmt)
-                    payment = result.scalar_one_or_none()
+            if resultado.get("success") and resultado.get("is_approved"):
+                payment_id = str(resultado.get("payment_id"))
+                external_ref = resultado.get("external_reference", "")
+                valor = resultado.get("amount", 0)
+                
+                # Extrair client_id da external_reference (formato: bot_CLIENTID_TIMESTAMP)
+                client_id = None
+                if external_ref and external_ref.startswith("bot_"):
+                    parts = external_ref.split("_")
+                    if len(parts) >= 2:
+                        client_id = parts[1]
+                
+                if client_id:
+                    # Atualizar status no banco de dados
+                    async with AsyncSessionLocal() as session:
+                        from sqlalchemy import select
+                        stmt = select(PaymentRecord).where(PaymentRecord.payment_id == payment_id)
+                        result = await session.execute(stmt)
+                        payment = result.scalar_one_or_none()
+                        
+                        if payment:
+                            payment.status = 'approved'
+                            payment.updated_at = datetime.utcnow()
+                            await session.commit()
+                            logger.info(f"Payment {payment_id} status updated to approved")
                     
-                    if payment:
-                        # Atualizar status
-                        payment.status = 'CONCLUIDA'
-                        payment.updated_at = datetime.utcnow()
-                        await session.commit()
-                        logger.info(f"Payment {request.payment_id} status updated to CONCLUIDA")
-            
-            # Enviar mensagem de confirmação para o Telegram
-            message = "✅ Pagamento confirmado! Seu acesso foi liberado."
-            
-            success = await send_telegram_message(
-                chat_id=str(client_id),
-                message=message
-            )
-            
-            if success:
-                logger.info(f"Payment confirmation sent to Telegram user {client_id}")
-                
-                # Registrar venda no Google Sheets (Empire Control sync)
-                valor_pago = request.valor or 0.0
-                try:
-                    from gsheets_integration import registrar_venda_bot
-                    registrar_venda_bot(
-                        client_id=str(client_id),
-                        conteudo="Pagamento PIX",
-                        valor=valor_pago,
-                        payment_id=request.payment_id or "unknown"
+                    # Enviar mensagem de confirmação
+                    message = "✅ *Pagamento confirmado!*\n\nSeu acesso foi liberado. Obrigado pela compra!"
+                    await send_telegram_message(chat_id=client_id, message=message)
+                    
+                    # Registrar venda no Google Sheets
+                    try:
+                        from gsheets_integration import registrar_venda_bot
+                        registrar_venda_bot(
+                            client_id=client_id,
+                            conteudo="Pagamento PIX MP",
+                            valor=valor,
+                            payment_id=payment_id
+                        )
+                        logger.info(f"Sale registered in Google Sheets")
+                    except Exception as gsheets_error:
+                        logger.warning(f"Failed to register sale in GSheets: {gsheets_error}")
+                    
+                    # Upsell
+                    await send_upsell_message(client_id, valor)
+                    
+                    return JSONResponse(
+                        status_code=200,
+                        content={"status": "success", "message": "Payment processed"}
                     )
-                    logger.info(f"Sale registered in Google Sheets for client {client_id}")
-                except Exception as gsheets_error:
-                    # Nao bloquear se Google Sheets falhar
-                    logger.warning(f"Failed to register sale in Google Sheets: {gsheets_error}")
-                
-                # Enviar mensagem de upsell após confirmação
-                await send_upsell_message(str(client_id), valor_pago)
-                
-                return JSONResponse(
-                    status_code=status.HTTP_200_OK,
-                    content={"status": "success", "message": "Notification sent"}
-                )
-            else:
-                logger.error(f"Failed to send payment confirmation to Telegram user {client_id}")
-                return JSONResponse(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    content={"status": "error", "message": "Failed to send notification"}
-                )
-        else:
-            # Status não é CONCLUIDA, apenas logar
-            logger.info(f"Webhook received with status {status_payment}, no action needed")
-            return JSONResponse(
-                status_code=status.HTTP_200_OK,
-                content={"status": "received", "message": "Webhook processed"}
-            )
+                else:
+                    logger.warning(f"Could not extract client_id from external_ref: {external_ref}")
             
-    except HTTPException:
-        raise
+            return JSONResponse(
+                status_code=200,
+                content={"status": "received"}
+            )
+        
+        # Outros tipos de notificação
+        return JSONResponse(status_code=200, content={"status": "ignored"})
+        
     except Exception as e:
         logger.error(f"Error processing webhook: {e}")
+        # Retornar 200 mesmo com erro para evitar reenvios do MP
+        return JSONResponse(status_code=200, content={"status": "error", "message": str(e)})
+
+
+@app.get("/payment/{payment_id}")
+async def get_payment_status(payment_id: str):
+    """
+    Consulta status de um pagamento
+    """
+    resultado = consultar_pagamento(payment_id)
+    
+    if resultado.get("success"):
+        return resultado
+    else:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=resultado.get("error", "Payment not found")
         )
+
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "service": "PIX Orchestrator API"}
+    return {"status": "healthy", "service": "PIX Orchestrator API - Mercado Pago"}
 
 @app.get("/")
 async def index():
     """Root endpoint"""
     return {
-        "service": "PIX Orchestrator Webhook Handler",
-        "version": "2.0.0",
-        "stack": "FastAPI + SQLAlchemy Async",
+        "service": "PIX Orchestrator - Mercado Pago",
+        "version": "3.0.0",
+        "stack": "FastAPI + SQLAlchemy Async + Mercado Pago",
         "endpoints": {
             "processar_pix": "/processar_pix",
-            "webhook": "/webhook/pix",
+            "webhook": "/webhook/mercadopago",
+            "payment_status": "/payment/{payment_id}",
             "health": "/health"
         }
     }
